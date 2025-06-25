@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  tools {
+    terraform 'tf 1.12'
+  }
+
   environment {
     TF_IN_AUTOMATION = 'true'
     AWS_REGION = 'us-east-1'
@@ -10,13 +14,19 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        git url: 'https://github.com/your-org/terraform-modules.git'
+        git credentialsId: 'github54-token', url: 'https://github.com/your-org/terraform-modules.git'
       }
     }
 
     stage('Terraform Init') {
       steps {
-        sh 'terraform init'
+        sh '''
+          terraform init \
+            -backend-config="bucket=your-bucket" \
+            -backend-config="key=dev/network/terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=your-lock-table"
+        '''
       }
     }
 
@@ -34,7 +44,6 @@ pipeline {
       }
     }
 
-   
     stage('Terraform Plan') {
       steps {
         sh 'terraform plan -out=tfplan.binary'
@@ -46,8 +55,8 @@ pipeline {
       when {
         branch 'main'
       }
-      input {
-        message "Approve apply to PRODUCTION?"
+      steps {
+        input message: '🛑 Please approve the Terraform APPLY to PRODUCTION'
       }
     }
 
